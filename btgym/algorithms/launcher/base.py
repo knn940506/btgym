@@ -26,6 +26,7 @@ import os
 from logbook import Logger, StreamHandler, WARNING, NOTICE, INFO, DEBUG
 import time
 import psutil
+import platform
 import glob
 from subprocess import PIPE
 import signal
@@ -96,6 +97,7 @@ class Launcher():
                                 - 'log_dir':      directory to save model and summaries, def: './tmp/btgym_aac_log'
 
         """
+        self.use_windows_os = True if platform.system() == 'Windows' else False
 
         self.env_config = dict(
             class_ref=None,
@@ -300,7 +302,11 @@ class Launcher():
             port_list = [port_list]
 
         for port in port_list:
-            p = psutil.Popen(['lsof', '-i:{}'.format(port), '-t'], stdout=PIPE, stderr=PIPE)
+            if self.use_windows_os:
+                p = psutil.Popen(['netstat', '-a|findstr:{}'.format(port), '-t'], stdout=PIPE, stderr=PIPE)
+            else:
+                p = psutil.Popen(['lsof', '-i:{}'.format(port), '-t'], stdout=PIPE, stderr=PIPE)
+
             pid = p.communicate()[0].decode()[:-1]  # retrieving PID
             if pid is not '':
                 p = psutil.Popen(['kill', pid])
@@ -384,7 +390,10 @@ class Launcher():
                 '**  Press `Ctrl-C` or jupyter:[Kernel]->[Interrupt] to stop training and close launcher.  **\n' + \
                 '********************************************************************************************\n'
         print(msg)
-        signal.pause()
+        if self.use_windows_os:
+            time.sleep(3)
+        else:
+            signal.pause()
 
         # Wait every worker to finish:
         for worker in workers_list:
